@@ -76,7 +76,7 @@ def handle_message(sender_id, message_text):
                 f"- عدد ليكات القديمة : {likes_before}\n"
                 f"- عدد ليكات الحالية : {likes_after} ✊🏻\n"
                 f"- عدد ليكات المضافة : {likes_added} 💀\n"
-                "مطور البوت : https://www.instagram.com/mohamed.abwjdan?igsh=MWdzajk5aTNsbjAzZg=="
+                "مطور البوت : https://www.instagram.com/mohamed.abwjdan"
             )
 
             # إذا مكيزيدش ليكات
