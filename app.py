@@ -1,11 +1,11 @@
 from flask import Flask, request
 import requests
+import re
 
 app = Flask(__name__)
 
 PAGE_ACCESS_TOKEN = "EAAnpHaKS0ZAsBPsC16IJvU4odCutNSj2PzbECwzWlPpksfWIZCVhGhrvUaLLDHa1cT5hZCZAs74eKjfwZBzAEdRLFl1PzRsDRPeFJoONA7831L0AEk1NrkbBufdZCFZCVSsh3rgIQ3msAdgEg1q0KUg4ZC7pUiYrmnFgYZBOLixKWYRecf8MzOb8EAGoNwdjGogRdYelPU3phBwZDZD"
 VERIFY_TOKEN = "YOUR_VERIFY_TOKEN"
-
 
 @app.route("/webhook", methods=["GET"])
 def verify():
@@ -55,22 +55,35 @@ def handle_message(sender_id, message_text):
             if not api_response:
                 return send_message(sender_id, "⚠️ الخدمة تحت صيانة.")
 
-            # ✅ تغيير السطر الأخير فقط
-            if "DEV API:" in api_response:
-                lines = api_response.splitlines()
-                new_lines = []
-                for line in lines:
-                    if line.startswith("DEV API:"):
-                        new_lines.append("DEV API: abwjdan")
-                    else:
-                        new_lines.append(line)
-                api_response = "\n".join(new_lines)
+            # استخراج المعلومات باستعمال regex
+            uid = re.search(r"UID:\s*(\d+)", api_response)
+            name = re.search(r"Name:\s*(.+)", api_response)
+            likes_before = re.search(r"Likes Before:\s*(\d+)", api_response)
+            likes_after = re.search(r"Likes After:\s*(\d+)", api_response)
+            likes_added = re.search(r"Likes Added:\s*(\d+)", api_response)
 
-            # إذا Likes Added: 0 → رسالة خاصة
-            if "Likes Added: 0" in api_response:
-                return send_message(sender_id, "✅ تم استهلاك رصيد اليوم. قوم بمشاركة البوت وعد غداً.")
+            uid = uid.group(1) if uid else "غير معروف"
+            name = name.group(1) if name else "غير معروف"
+            likes_before = likes_before.group(1) if likes_before else "0"
+            likes_after = likes_after.group(1) if likes_after else "0"
+            likes_added = likes_added.group(1) if likes_added else "0"
 
-            send_message(sender_id, api_response)
+            # تنسيق الرد الجديد
+            reply = (
+                "[✓] تم إرسال بنجاح ✅\n"
+                f"- لأيدي : {uid} 💎\n"
+                f"-  {name}: اسم الحساب 🍑\n"
+                f"- عدد ليكات القديمة : {likes_before}\n"
+                f"- عدد ليكات الحالية : {likes_after} ✊🏻\n"
+                f"- عدد ليكات المضافة : {likes_added} 💀\n"
+                "مطور البوت : https://www.instagram.com/mohamed.abwjdan?igsh=MWdzajk5aTNsbjAzZg=="
+            )
+
+            # إذا مكيزيدش ليكات
+            if likes_added == "0":
+                reply = "✅ تم استهلاك رصيد اليوم. قوم بمشاركة البوت وعد غداً."
+
+            send_message(sender_id, reply)
 
         except Exception as e:
             print("API Error:", e)
@@ -93,4 +106,4 @@ def send_message(sender_id, text):
 
 if __name__ == "__main__":
     app.run(port=3000, debug=True)
-          
+                
