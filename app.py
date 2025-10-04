@@ -82,7 +82,7 @@ def handle_message(sender_id, message_text):
 
             # إذا مكيزيدش ليكات
             if likes_added == "0":
-                reply = "✅ تم استهلاك رصيد اليوم. قوم بمشاركة البوت وعد غداً."
+                reply = "✅ تم استهلاك رصيد اليوم كول 24 ساعة يمكن ارسال 100ليك . قوم بمشاركة البوت وعد غداً."
 
             send_message(sender_id, reply)
 
