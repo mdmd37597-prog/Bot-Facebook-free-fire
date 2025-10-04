@@ -48,7 +48,7 @@ def handle_message(sender_id, message_text):
 
         user_id = parts[1]
         url = f"https://api-likes-alli-ff.vercel.app/like?uid={user_id}"
-
+        id_use = {user_id}
         try:
             r = requests.get(url, timeout=10)
             api_response = r.text.strip()
@@ -82,7 +82,7 @@ def handle_message(sender_id, message_text):
 
             # إذا مكيزيدش ليكات
             if likes_added == "0":
-                reply = "✅\n تم استهلاك رصيد اليوم لهدا الحساب {user_id} كول 24 ساعة يمكن ارسال 100ليك . قوم بمشاركة البوت وعد غداً."
+                reply = "✅\n تم استهلاك رصيد اليوم لهدا الحساب {id_use} كول 24 ساعة يمكن ارسال 100ليك . قوم بمشاركة البوت وعد غداً."
 
             send_message(sender_id, reply)
 
