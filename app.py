@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify
 
 # Config from env
 PAGE_ACCESS_TOKEN = "EAAnpHaKS0ZAsBPm4HMLst2CeyV8QIGRhZAH7vZAqHGLQKd84SrkgsRZBQATeJAkrIay50ZBEqHZB2WflsklDUGzqWo3SlSx9vLz4eRSffbVGhZAxtt7cYjkJTJg1TtUmt5ba3M6DjppWmZBGhjr2WGd4jigiCNE23MCZASpXFHBUoOaxtKrngCQGeFEX9KxDs62jhDUNXLMwRbwZDZD"
-VERIFY_TOKEN = "YOUR_VERIFY_TOKEN"
+VERIFY_TOKEN = "YOUR_VERIFY_TOKENNNN"
 if not PAGE_ACCESS_TOKEN:
     raise RuntimeError("Set PAGE_ACCESS_TOKEN environment variable")
 
@@ -144,10 +144,10 @@ def webhook():
                 # نبحث على رابط داخل النص
                 m = URL_REGEX.search(text)
                 if not m:
-                    send_text(sender_id, "عفاك صيفط lia رابط ديال المنشور (مثال: رابط تيك توك أو انستغرام).")
+                    send_text(sender_id, " ✨عفاك صيفط lia رابط ديال المنشور (مثال: رابط تيك توك أو انستغرام).")
                     continue
                 social_link = m.group(1)
-                send_text(sender_id, "جاري معالجة الرابط...")
+                send_text(sender_id, "👾جاري معالجة الرابط...")
 
                 # ناديو على dfkz
                 dfkz_resp = call_dfkz(social_link)
