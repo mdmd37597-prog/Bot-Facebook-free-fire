@@ -1,186 +1,137 @@
 import os
 import re
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask, request
 
-# Config from env
+# إعداد الرموز
 PAGE_ACCESS_TOKEN = "EAAnpHaKS0ZAsBPm4HMLst2CeyV8QIGRhZAH7vZAqHGLQKd84SrkgsRZBQATeJAkrIay50ZBEqHZB2WflsklDUGzqWo3SlSx9vLz4eRSffbVGhZAxtt7cYjkJTJg1TtUmt5ba3M6DjppWmZBGhjr2WGd4jigiCNE23MCZASpXFHBUoOaxtKrngCQGeFEX9KxDs62jhDUNXLMwRbwZDZD"
 VERIFY_TOKEN = "YOUR_VERIFY_TOKENNNN"
-if not PAGE_ACCESS_TOKEN:
+PORT = int(os.getenv("PORT", 5000))
+
+if not PAGE_ACCESS_TOKEN or "YOUR_PAGE_ACCESS_TOKEN" in PAGE_ACCESS_TOKEN:
     raise RuntimeError("Set PAGE_ACCESS_TOKEN environment variable")
 
 app = Flask(__name__)
 
 DFKZ_API = "https://api.dfkz.xo.je/apis/v3/download.php"
+URL_REGEX = re.compile(r"(https?://[^\s]+)", flags=re.IGNORECASE)
 
-# بسيطة: كتجمع اللينك من النص
-URL_REGEX = re.compile(
-    r"(https?://[^\s]+)",
-    flags=re.IGNORECASE
-)
+# لائحة الرسائل اللي تعالجت باش مانعاودوش نردو عليها
+processed_mids = set()
+MAX_PROCESSED = 2000
+
 
 def call_dfkz(social_url):
-    """ينادي على API ديال dfkz ويرجع JSON"""
+    """ينادي على API ديال dfkz"""
     try:
-        resp = requests.get(DFKZ_API, params={"url": social_url}, timeout=30)
-        resp.raise_for_status()
-        return resp.json()
+        r = requests.get(DFKZ_API, params={"url": social_url}, timeout=20)
+        r.raise_for_status()
+        return r.json()
     except Exception as e:
         return {"error": str(e)}
 
+
 def send_text(psid, text):
-    """يبعث رسالة نصية للمستعمل"""
-    url = f"https://graph.facebook.com/v17.0/me/messages"
-    payload = {
-        "recipient": {"id": psid},
-        "message": {"text": text}
-    }
+    """يبعث رسالة نصية"""
+    url = "https://graph.facebook.com/v17.0/me/messages"
     params = {"access_token": PAGE_ACCESS_TOKEN}
-    r = requests.post(url, params=params, json=payload, timeout=20)
-    return r.status_code, r.text
+    payload = {"recipient": {"id": psid}, "message": {"text": text}}
+    requests.post(url, params=params, json=payload, timeout=15)
 
-def send_video_by_url(psid, video_url, title=None):
-    """
-    يحاول يصيفط الفيديو مباشرة باستخدام attachment url
-    (متطلب: URL خاص ومتوفر للـ Facebook ليحمّلوه من عنده)
-    """
-    url = f"https://graph.facebook.com/v17.0/me/messages"
-    message = {
-        "recipient": {"id": psid},
-        "message": {
-            "attachment": {
-                "type": "video",
-                "payload": {
-                    "url": video_url,
-                    "is_reusable": False
-                }
-            }
-        }
-    }
+
+def send_video(psid, video_url, title=None):
+    """يبعث الفيديو مباشرة من URL"""
     if title:
-        # نرسل العنوان قبيل الفيديو (اختياري)
         send_text(psid, title)
+
+    url = "https://graph.facebook.com/v17.0/me/messages"
     params = {"access_token": PAGE_ACCESS_TOKEN}
-    r = requests.post(url, params=params, json=message, timeout=30)
-    return r.status_code, r.text
-
-def upload_and_send_video(psid, video_url, filename="video.mp4", title=None):
-    """
-    احتياطي: يحمل الفيديو محليًّا وبعْدُ يرفع attachment فعليًا عبر
-    /me/message_attachments ثم يبعت للمستخدم. (أكثر موثوقية إذا attachment_url مفشل)
-    """
-    # 1) نحمل الفيديو
-    try:
-        r = requests.get(video_url, stream=True, timeout=60)
-        r.raise_for_status()
-    except Exception as e:
-        return False, f"download failed: {e}"
-
-    # نحفظ مؤقتاً
-    temp_path = f"/tmp/{filename}"
-    with open(temp_path, "wb") as f:
-        for chunk in r.iter_content(1024*1024):
-            if chunk:
-                f.write(chunk)
-
-    # 2) نعمل upload للملف كـ attachment
-    attach_url = f"https://graph.facebook.com/v17.0/me/message_attachments"
-    params = {"access_token": PAGE_ACCESS_TOKEN}
-    files = {
-        "filedata": (filename, open(temp_path, "rb"), "video/mp4")
-    }
-    data = {
-        "message": '{"attachment":{"type":"video","payload":{}}}'
-    }
-    try:
-        resp = requests.post(attach_url, params=params, files=files, data=data, timeout=60)
-        resp.raise_for_status()
-        attachment_id = resp.json().get("attachment_id")
-    except Exception as e:
-        return False, f"upload failed: {e}"
-
-    # 3) نبعت للمستخدم بattachment_id
-    send_url = f"https://graph.facebook.com/v17.0/me/messages"
     payload = {
         "recipient": {"id": psid},
         "message": {
             "attachment": {
                 "type": "video",
-                "payload": {"attachment_id": attachment_id}
+                "payload": {"url": video_url, "is_reusable": False},
             }
-        }
+        },
     }
-    resp2 = requests.post(send_url, params=params, json=payload, timeout=30)
-    return resp2.status_code == 200, resp2.text
+    requests.post(url, params=params, json=payload, timeout=30)
+
 
 @app.route("/", methods=["GET"])
-def index():
-    return "FB Messenger Bot - dfkz video relay"
+def home():
+    return "Bot running ✅"
 
-# Webhook verification (Facebook)
+
 @app.route("/webhook", methods=["GET"])
 def verify():
     mode = request.args.get("hub.mode")
     token = request.args.get("hub.verify_token")
     challenge = request.args.get("hub.challenge")
+
     if mode == "subscribe" and token == VERIFY_TOKEN:
         return challenge, 200
     return "Verification token mismatch", 403
 
-# Webhook to receive messages
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json()
-    if data is None:
+    if not data:
         return "No JSON", 400
 
-    # Facebook may batch multiple entries
     for entry in data.get("entry", []):
-        for messaging in entry.get("messaging", []):
-            sender_id = messaging.get("sender", {}).get("id")
-            # رسالة نصية واردة
-            if "message" in messaging and "text" in messaging["message"]:
-                text = messaging["message"]["text"]
-                # نبحث على رابط داخل النص
-                m = URL_REGEX.search(text)
-                if not m:
-                    send_text(sender_id, " ✨عفاك صيفط lia رابط ديال المنشور (مثال: رابط تيك توك أو انستغرام).")
-                    continue
-                social_link = m.group(1)
-                send_text(sender_id, "👾جاري معالجة الرابط...")
+        for msg in entry.get("messaging", []):
+            message = msg.get("message", {})
 
-                # ناديو على dfkz
-                dfkz_resp = call_dfkz(social_link)
-                if dfkz_resp.get("error"):
-                    send_text(sender_id, "مكينش نجاح فالاتصال بالـ API: " + dfkz_resp["error"])
-                    continue
+            # نتجاهل echo (الردود ديال البوت نفسه)
+            if message.get("is_echo"):
+                continue
 
-                # ناخدو أول رابط نوع video
-                links = dfkz_resp.get("links", [])
-                video_url = None
-                for link in links:
-                    if link.get("type") == "video":
-                        video_url = link.get("url")
-                        break
+            # نستخرج mid ونتأكد ماعالجناش نفس الرسالة من قبل
+            mid = message.get("mid")
+            if mid and mid in processed_mids:
+                continue
+            if mid:
+                processed_mids.add(mid)
+                if len(processed_mids) > MAX_PROCESSED:
+                    processed_mids.clear()
 
-                if not video_url:
-                    send_text(sender_id, "ما تم العثور على فيديو فهاد الرابط. حاول رابط آخر.")
-                    continue
+            sender_id = msg.get("sender", {}).get("id")
+            if not sender_id:
+                continue
 
-                # نجرب نبعت الفيديو باستعمال attachment_url
-                status, resp_text = send_video_by_url(sender_id, video_url, title=dfkz_resp.get("title"))
-                if status != 200:
-                    # إذا فشل، نجرب upload
-                    ok, info = upload_and_send_video(sender_id, video_url)
-                    if ok:
-                        send_text(sender_id, "تم إرسال الفيديو (upload fallback).")
-                    else:
-                        send_text(sender_id, "فشل إرسال الفيديو: " + str(info))
-                else:
-                    send_text(sender_id, "هاهو الفيديو ▶️")
+            text = message.get("text", "")
+            match = URL_REGEX.search(text)
+            if not match:
+                send_text(sender_id, "🔗 صيفط رابط ديال الفيديو (من تيك توك أو إنستغرام).")
+                continue
 
+            social_url = match.group(1)
+            send_text(sender_id, "⏳ جاري جلب الفيديو...")
+
+            # نجيب البيانات من dfkz
+            dfkz_data = call_dfkz(social_url)
+            if "error" in dfkz_data:
+                send_text(sender_id, f"❌ خطأ فـ API: {dfkz_data['error']}")
+                continue
+
+            links = dfkz_data.get("links", [])
+            video_url = next((l["url"] for l in links if l.get("type") == "video"), None)
+
+            if not video_url:
+                send_text(sender_id, "❌ ما لقيتش فيديو فالرابط.")
+                continue
+
+            # نرسل الفيديو مرة وحدة فقط
+            send_video(sender_id, video_url, title=dfkz_data.get("title"))
+            send_text(sender_id, "✅ تم إرسال الفيديو.")
+            print(f"✔ تم إرسال الفيديو للمستخدم {sender_id}")
+
+    # نجاوب فيسبوك بسرعة باش مايعاودش الويب هوك
     return "OK", 200
 
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
-    
+    app.run(host="0.0.0.0", port=PORT)
+        
